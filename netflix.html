@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Netflix Content Analysis Dashboard</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--tx:#161a23;--mut:#667085;--bd:#e4e7ee;--red:#e50914;--blue:#4f7cff;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0f13;--card:#181a20;--tx:#f1f2f5;--mut:#9aa1b0;--bd:#2a2d37;--red:#ff4d57;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e0f13;--card:#181a20;--tx:#f1f2f5;--mut:#9aa1b0;--bd:#2a2d37;--red:#ff4d57;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 32px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+h1{font-size:22px;margin:0}h1 span{color:var(--red)}
+.sub{color:var(--mut);font-size:13px}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+label{display:flex;flex-direction:column;font-size:11px;color:var(--mut);gap:2px}
+select,button{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:6px 10px}
+button{cursor:pointer;align-self:flex-end}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px}
+.k{color:var(--mut);font-size:12px}.v{font-size:24px;font-weight:650;margin-top:2px}
+.g2{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+@media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+h2{font-size:14px;margin:0 0 10px}
+.plot{display:flex;align-items:flex-end;gap:6px;height:240px;overflow-x:auto}
+.col{flex:1;min-width:28px;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;text-align:center;font-size:11px;color:var(--mut)}
+.stk{display:flex;flex-direction:column;border-radius:3px;overflow:hidden}
+.leg{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:8px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px}
+.dw{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
+.dn{width:160px;height:160px;border-radius:50%;position:relative;flex:none}
+.dn::after{content:"";position:absolute;inset:27%;border-radius:50%;background:var(--card)}
+.rl{font-size:12px}.rl div{display:flex;align-items:center;gap:6px;line-height:1.8}.rl i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.hb{display:grid;grid-template-columns:110px 1fr 40px;align-items:center;gap:8px;padding:4px 0;cursor:pointer;font-size:13px}
+.hb.dim{opacity:.4}.hb b{text-align:right;font-weight:600}
+.t{height:14px;background:var(--bd);border-radius:7px;overflow:hidden;display:block}
+.t i{display:block;height:100%;background:var(--red);border-radius:7px}
+.note{color:var(--mut);font-size:12px}
+</style></head>
+<body><div class="wrap">
+<header>
+<div><h1><span>▍</span>Netflix Content Analysis</h1><div class="sub">Catalog trends by type, genre, country and rating · synthetic sample data · click bars to filter</div></div>
+<div class="filters">
+<label>Type<select id="ty"><option>All</option><option>Movie</option><option>TV Show</option></select></label>
+<label>Genre<select id="ge"></select></label>
+<label>Country<select id="co"></select></label>
+<label>Added from<select id="y0"></select></label>
+<label>to<select id="y1"></select></label>
+<button id="rst">Reset</button>
+</div></header>
+<div class="kpis" id="kpis"></div>
+<div class="g2">
+<div class="card"><h2>Titles added per year</h2><div class="plot" id="pl"></div><div class="leg"><span><i style="background:var(--red)"></i>Movie</span><span><i style="background:var(--blue)"></i>TV Show</span></div></div>
+<div class="card"><h2>Maturity rating mix</h2><div class="dw"><div class="dn" id="dn"></div><div class="rl" id="rl"></div></div></div>
+</div>
+<div class="g3">
+<div class="card"><h2>Top genres</h2><div id="bg"></div></div>
+<div class="card"><h2>Top producing countries</h2><div id="bc"></div></div>
+</div>
+<div class="note">Dataset is generated for demonstration (900 titles, 2015–2025). Built with plain HTML, CSS and JavaScript, no external libraries.</div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+let s=7;const rnd=()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const pick=l=>{let r=rnd()*l.reduce((a,x)=>a+x[1],0);for(const [v,w] of l){if((r-=w)<0)return v}return l[0][0]};
+const GM=[["Drama",22],["Comedy",16],["Documentary",12],["Action",12],["Thriller",9],["Romance",7],["Horror",6],["Family",6],["Sci-Fi",5]];
+const GT=[["Drama",22],["Comedy",12],["Docuseries",10],["Reality",10],["Crime",14],["Anime",12],["Kids",12],["Sci-Fi",5]];
+const CO=[["United States",38],["India",12],["United Kingdom",9],["South Korea",8],["Japan",7],["Spain",5],["France",5],["Brazil",4],["Mexico",4],["Germany",3],["Other",5]];
+const RT=[["TV-MA",35],["TV-14",25],["R",10],["PG-13",8],["TV-PG",8],["PG",5],["TV-Y7",5],["TV-G",4]];
+const PAL=["#e50914","#f5a524","#18b394","#4f7cff","#8b5cf6","#e879a9","#98a2b3","#475467"];
+const D=[];
+for(let i=0;i<900;i++){const t=rnd()<.69?"Movie":"TV Show",ya=2015+Math.floor(Math.pow(rnd(),.55)*11);
+ D.push({t,ya,g:pick(t=="Movie"?GM:GT),c:pick(CO),r:pick(RT),d:t=="Movie"?Math.round(70+(rnd()+rnd()+rnd())*20):pick([[1,65],[2,20],[3,10],[4,5]])})}
+const YR=[];for(let y=2015;y<=2025;y++)YR.push(y);
+const genres=[...new Set([...GM,...GT].map(x=>x[0]))].sort(),countries=CO.map(x=>x[0]);
+const opt=(el,a)=>$(el).innerHTML=a.map(x=>`<option>${x}</option>`).join("");
+opt("ge",["All",...genres]);opt("co",["All",...countries]);opt("y0",YR);opt("y1",YR);$("y1").value=2025;
+function rows(skip){const t=$("ty").value,g=$("ge").value,c=$("co").value,a=+$("y0").value,b=+$("y1").value;
+ return D.filter(d=>d.ya>=a&&d.ya<=b&&(t=="All"||d.t==t)&&(skip=="g"||g=="All"||d.g==g)&&(skip=="c"||c=="All"||d.c==c))}
+const cnt=(a,k)=>{const o={};a.forEach(x=>o[x[k]]=(o[x[k]]||0)+1);return o};
+const topN=(o,n)=>Object.entries(o).sort((x,y)=>y[1]-x[1]).slice(0,n);
+function hbars(el,list,sel){const mx=Math.max(1,...list.map(x=>x[1])),v=$(sel).value;
+ $(el).innerHTML=list.map(([l,n])=>`<div class="hb${v=="All"||v==l?"":" dim"}" data-l="${l}"><span>${l}</span><span class="t"><i style="width:${n/mx*100}%"></i></span><b>${n}</b></div>`).join("");
+ $(el).querySelectorAll(".hb").forEach(r=>r.onclick=()=>{const e=$(sel);e.value=e.value==r.dataset.l?"All":r.dataset.l;render()})}
+function render(){
+ const a=rows(),n=a.length,mv=a.filter(x=>x.t=="Movie"),tv=a.filter(x=>x.t=="TV Show"),avg=(l,k)=>l.length?l.reduce((t,x)=>t+x[k],0)/l.length:0,tg=topN(cnt(a,"g"),1)[0];
+ $("kpis").innerHTML=[["Titles",n.toLocaleString()],["Movies",(n?mv.length/n*100:0).toFixed(0)+"%"],["TV shows",(n?tv.length/n*100:0).toFixed(0)+"%"],["Avg movie length",Math.round(avg(mv,"d"))+" min"],["Avg seasons",avg(tv,"d").toFixed(1)],["Top genre",tg?tg[0]:"–"]].map(([k,v])=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+ const y0=+$("y0").value,y1=+$("y1").value,ys=YR.filter(y=>y>=y0&&y<=y1),
+  ym=ys.map(y=>[y,mv.filter(x=>x.ya==y).length,tv.filter(x=>x.ya==y).length]),mx=Math.max(1,...ym.map(x=>x[1]+x[2]));
+ $("pl").innerHTML=ym.map(([y,m,t])=>`<div class="col" title="${y}: ${m} movies, ${t} TV shows"><span>${m+t}</span><div class="stk" style="height:${Math.round((m+t)/mx*180)}px"><div style="flex:${t};background:var(--blue)"></div><div style="flex:${m};background:var(--red)"></div></div><span>${y}</span></div>`).join("");
+ const R=cnt(a,"r");let acc=0;const tot=n||1;
+ $("dn").style.background="conic-gradient("+RT.map((x,i)=>{const p=acc/tot*100;acc+=R[x[0]]||0;return`${PAL[i]} ${p}% ${acc/tot*100}%`}).join(",")+")";
+ $("rl").innerHTML=RT.map((x,i)=>`<div><i style="background:${PAL[i]}"></i>${x[0]} · ${Math.round((R[x[0]]||0)/tot*100)}%</div>`).join("");
+ hbars("bg",topN(cnt(rows("g"),"g"),8),"ge");hbars("bc",topN(cnt(rows("c"),"c"),8),"co");
+}
+["ty","ge","co","y0","y1"].forEach(i=>$(i).onchange=e=>{if(+$("y0").value>+$("y1").value){if(e.target.id=="y0")$("y1").value=$("y0").value;else $("y0").value=$("y1").value}render()});
+$("rst").onclick=()=>{["ty","ge","co"].forEach(i=>$(i).value="All");$("y0").value=2015;$("y1").value=2025;render()};
+render();
+</script></body></html>
